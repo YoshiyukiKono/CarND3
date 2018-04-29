@@ -1,3 +1,0 @@
-/mnt/c/Work/Udacity/CarND_Term3/github/CarND3/Path-Planning-Project/build/CMakeFiles/edit_cache.dir
-/mnt/c/Work/Udacity/CarND_Term3/github/CarND3/Path-Planning-Project/build/CMakeFiles/rebuild_cache.dir
-/mnt/c/Work/Udacity/CarND_Term3/github/CarND3/Path-Planning-Project/build/CMakeFiles/path_planning.dir
