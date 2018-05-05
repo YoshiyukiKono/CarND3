@@ -17,12 +17,23 @@ using namespace std;
 class BehaviorPlanner {
 public:
 
+	const int SAFE_DISTANCE = 20;
+	double fore_s_right;
+	double fore_s_vehicle;
+
 	int recommended_lane;
 	double faster_lane_speed;
 	double farther_lane_s;
 	double ego_lane_speed;
 	double ego_lane_s;
+	double farther_L_s;
+	double faster_L_v;
+	double farther_R_s;
+	double faster_R_v;
 
+	double L_vehicle_num;
+	double R_vehicle_num;
+	
 	int update_width = 70;
 
   	string ego_rep = " *** ";
@@ -78,5 +89,7 @@ public:
 
 	void find_vehicle_forward(int lane_num, int s);
 	void find_vehicle_backward(int lane_num, int s);
+	
+	void init_recommend_lane();
 };
 #endif

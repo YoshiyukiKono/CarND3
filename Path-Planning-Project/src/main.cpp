@@ -165,6 +165,52 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 	return {x,y};
 
 }
+// Adapted from Q&A
+void define_path(vector<double>& next_x_vals, vector<double>& next_y_vals, vector<double>& ptsx, vector<double>& ptsy, vector<double> previous_path_x, vector<double> previous_path_y,
+double ref_x, double ref_y, double ref_yaw, double ref_vel) {
+	
+	tk::spline s;
+	s.set_points(ptsx, ptsy);
+
+	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+
+	// Start with all of the previous path points from last time
+	for(int i = 0; i < previous_path_x.size(); i++)
+	{
+		next_x_vals.push_back(previous_path_x[i]);
+		next_y_vals.push_back(previous_path_y[i]);
+	}
+
+	// Calculate how to break up spline points so that we trevel at our desired reference
+	double target_x = 30.0;
+	double target_y = s(target_x);
+	double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
+
+	double x_add_on = 0;
+
+	// Fill up the rest of our path planner after filling it with previous points,
+	// here we will always output 50 points
+	for (int i = 1; i <= 50 - previous_path_x.size(); i++) {
+		double N = (target_dist/(.02*ref_vel/2.24));
+		double x_point = x_add_on + target_x/N;
+		double y_point = s(x_point);
+		
+		x_add_on = x_point;
+		
+		double x_ref = x_point;
+		double y_ref = y_point;
+		
+		// rotate back to normal after rotating it earlier
+		x_point = (x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw));
+		y_point = (x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw));
+		
+		x_point += ref_x;
+		y_point += ref_y;
+		
+		next_x_vals.push_back(x_point);
+		next_y_vals.push_back(y_point);
+	}
+}
 
 int main() {
   uWS::Hub h;
@@ -262,7 +308,7 @@ int main() {
           	//double a = 0;
           	//Vehicle ego_vehicle = Vehicle(lane,car_s,car_speed,a);
           	behavior_planner.add_ego(lane,car_s,car_speed);
-          	
+          	//behavior_planner.init_recommend_lane();
           	// find ref_v to use
           	for(int i = 0; i < sensor_fusion.size(); i++)
           	{
@@ -280,7 +326,8 @@ int main() {
           			
           			check_car_s += ((double)prev_size*.02*check_speed); // if using previous points can project s value out...
           			// check s values greater than mine and s gap
-          			if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+          			const int SAFE_DISTANCE = 30;
+          			if((check_car_s > car_s) && ((check_car_s - car_s) < SAFE_DISTANCE))//30))
           			{
           				// Do some logic here, lower reference velocity so we dont crash into the car in front of us, could...
           				// also flog to try to change lanes.
@@ -295,18 +342,20 @@ int main() {
           				} 
           				else if(lane == 1)
           				{
-          					bool is_safe_to_move_right = behavior_planner.is_safe_to_move(lane + 1);
+          					behavior_planner.init_recommend_lane();
           					bool is_safe_to_move_left = behavior_planner.is_safe_to_move(lane - 1);
-          					/*
+          					bool is_safe_to_move_right = behavior_planner.is_safe_to_move(lane + 1);
+          					
           					if (is_safe_to_move_right && is_safe_to_move_left) {
+std::cout << "main - L & R are SAFE. So, call recommend_lane"  << std::endl;
           						lane_change = true;
-          						lane = road.recommend_lane();
-          					} else 
-          					*/
-          					if (is_safe_to_move_right) {
+          						lane = behavior_planner.recommend_lane();
+          					} else if (is_safe_to_move_right) {
+std::cout << "main - only Right is safe."  << std::endl;
           						lane_change = true;
           						lane += 1;
           					} else if (is_safe_to_move_left) {
+std::cout << "main - only Left is safe."  << std::endl;
           						lane_change = true;
           						lane -= 1;
           					}
@@ -322,12 +371,13 @@ int main() {
           			}
           		}
           	}
-          	//
+          	/*
           	if(!lane_change && behavior_planner.is_better_to_move())
           	{
           		int lane = behavior_planner.recommend_lane();
           		lane_change = true;
           	}
+          	*/
 
           	if(too_close)
           	{
@@ -405,15 +455,16 @@ int main() {
           		
           	}
           	
-          	tk::spline s;
-          	s.set_points(ptsx, ptsy);
-          	
-          	
           	// Define the actual (x, y) points we will use for the planer
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
-
-
+          	
+          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+          	define_path(next_x_vals, next_y_vals, ptsx, ptsy, previous_path_x, previous_path_y, ref_x, ref_y, ref_yaw, ref_vel);
+/*
+          	tk::spline s;
+          	s.set_points(ptsx, ptsy);
+*/
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
           	/*
           	double dist_inc = 0.3;//0.5;
@@ -428,6 +479,7 @@ int main() {
           		next_y_vals.push_back(car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
           	}
           	*/
+/*
           	// Start with all of the previous path points from last time
           	for(int i = 0; i < previous_path_x.size(); i++)
           	{
@@ -464,7 +516,7 @@ int main() {
           		next_x_vals.push_back(x_point);
           		next_y_vals.push_back(y_point);
           	}
-
+*/
           	json msgJson;
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;

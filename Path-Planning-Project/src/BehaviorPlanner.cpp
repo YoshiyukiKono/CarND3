@@ -6,7 +6,7 @@
 #include <string>
 #include <iterator>
 
-
+// 5/4 12:13 âEÇ…ã»Ç™ÇÁÇ»Ç¢ÅIÅI
 /**
  * Initializes BehaviorPlanner
  */
@@ -45,6 +45,7 @@ int BehaviorPlanner::convert_to_lane(float d) {
 	{
 		lane = 2;
 	}
+	return lane;
 }
 void BehaviorPlanner::populate_traffic(vector<vector<double>>  sensor_fusion) {
   	// find ref_v to use
@@ -59,6 +60,7 @@ void BehaviorPlanner::populate_traffic(vector<vector<double>>  sensor_fusion) {
 		double check_speed = sqrt(vx*vx + vy*vy);
 		double check_car_s = sensor_fusion[i][5];
 		double a = 0;
+		// int lane, float s, float v, float a, string state
 		Vehicle vehicle = Vehicle(lane,check_car_s,check_speed,a);
 		this->vehicles.insert(std::pair<int,Vehicle>(sensor_fusion[i][0],vehicle));
 		
@@ -92,7 +94,7 @@ void BehaviorPlanner::populate_traffic() {
 	}
 	
 }
-
+/*
 void BehaviorPlanner::advance() {
 	
 	map<int ,vector<Vehicle> > predictions;
@@ -121,7 +123,7 @@ void BehaviorPlanner::advance() {
     }
     
 }
-
+*/
 void BehaviorPlanner::find_vehicle_forward(int lane_num, int s) {
 	
 	map<int, Vehicle>::iterator it = this->vehicles.begin();
@@ -172,7 +174,7 @@ void BehaviorPlanner::add_ego(int lane_num, int s, vector<int> config_data) {
     this->vehicles.insert(std::pair<int,Vehicle>(ego_key,ego));
     
 }
-
+/*
 void BehaviorPlanner::display(int timestep) {
 
     Vehicle ego = this->vehicles.find(this->ego_key)->second;
@@ -262,74 +264,126 @@ void BehaviorPlanner::display(int timestep) {
     cout << oss.str();
 
 }
-
+*/
 bool BehaviorPlanner::is_safe_to_move(int lane_num) {
+//std::cout << "is_safe_to_move - lane_num:" << lane_num << " vehicles.size():" << vehicles.size() << std::endl;
+//std::cout << "is_safe_to_move - [Ego]  ego_vehicle.s:" << ego_vehicle.s << " ego_vehicle.v:" << ego_vehicle.v << std::endl;
+
 	bool is_safe = false;
-	map<int, Vehicle>::iterator it = this->vehicles.begin();
+	bool is_fore_safe = false;
+	bool is_back_safe = false;
 	int back_vehicle_s = 0;
 	int back_vehicle_v = 0;
 	int fore_vehicle_s = 0;
 	int fore_vehicle_v = 0;
+	
+	map<int, Vehicle>::iterator it = this->vehicles.begin();
     while(it != this->vehicles.end())
     {
     	int v_id = it->first;
         Vehicle v = it->second;
+//std::cout << "is_safe_to_move - v_id:" << v_id << " v.lane:" << v.lane << " v.s:" << v.s <<  " v.v:" << v.v << std::endl;
+
+		if(v.lane == 0) {
+			L_vehicle_num += 1;
+		}
+		if(v.lane == 2) {
+			R_vehicle_num += 1;
+		}
         if(v.lane == lane_num) {
-        	if (v.s >= ego_vehicle.s) {
-        		if (fore_vehicle_v == 0) {
+//std::cout << "is_safe_to_move = v_id:" << v_id << " v.lane:" << v.lane << " v.s:" << v.s <<  " v.v:" << v.v << std::endl;
+
+        	if (v.s >= ego_vehicle.s) { // fore vehicles
+//std::cout << "LOOP FORE v_id:" << v_id << " v.lane:" << v.lane << " v.s:" << v.s <<  " v.v:" << v.v << std::endl;
+
+        		if (fore_vehicle_v == 0) { // not yet initialized
+//std::cout << "INIT FORE v_id:" << v_id << " v.lane:" << v.lane << " v.s:" << v.s <<  " v.v:" << v.v << std::endl;
         			fore_vehicle_s = v.s;
         			fore_vehicle_v = v.v;
         		} else{
-        			if(fore_vehicle_s > v.s) {
+        			if(fore_vehicle_s > v.s) { // check the nearest one
+//std::cout << "UPDT FORE v_id:" << v_id << " v.lane:" << v.lane << " v.s:" << v.s <<  " v.v:" << v.v << std::endl;
+
         				fore_vehicle_s = v.s;
         				fore_vehicle_v = v.v;
         			}
         		}
-        	} else {
+        	} else { // back vehicles
+//std::cout << "is_safe_to_move BACK v_id:" << v_id << " v.lane:" << v.lane << " v.s:" << v.s <<  " v.v:" << v.v << std::endl;
+
         		if (back_vehicle_v == 0) {
         			back_vehicle_s = v.s;
         			back_vehicle_v = v.v;
         		} else{
-        			if(back_vehicle_s < v.s) {
+        			if(back_vehicle_s < v.s) { // check the nearest one
         				back_vehicle_s = v.s;
         				back_vehicle_v = v.v;
         			}
         		}
         	}
         }
-        /*
-        if(v.lane == lane_num && v.s > ego_vehicle.s && v.v < ego_vehicle.v)
-        {
-        	is_safe = false;
-        }
-        else if(v.lane == lane_num && v.s <= ego_vehicle.s && v.v >= ego_vehicle.v)
-        {
-        	is_safe = false;
-        }
-        */
         it++;
     }
-    if(fore_vehicle_v == 0 || fore_vehicle_v > ego_vehicle.v || fore_vehicle_s > ego_lane_s) {
-    	is_safe = true;
-    } else if(back_vehicle_v == 0 || back_vehicle_v < ego_vehicle.v) {
-     	if(!is_risky_to_move(back_vehicle_v)) {
-    		is_safe = true;
-    	}
-    } 
+    //if(fore_vehicle_v == 0 || fore_vehicle_v > ego_vehicle.v || fore_vehicle_s > ego_lane_s) {
+    //if(fore_vehicle_v == 0 || (fore_vehicle_s - ego_vehicle.s) > SAFE_DISTANCE || fore_vehicle_s > ego_lane_s) { EGO LANE?
+	if (back_vehicle_s == 0 || (ego_vehicle.s - back_vehicle_s) > SAFE_DISTANCE) {
+		is_back_safe = true;
+//std::cout << "[Back is SAFE.]  back_vehicle_s:" << back_vehicle_s << " ego_vehicle.s:" << ego_vehicle.s << std::endl;
 
-    if (is_safe) {
-    	if(fore_vehicle_v == 0) {
-    		recommended_lane = lane_num;
-    	} 
-    	else if (farther_lane_s > fore_vehicle_s) {
-    		farther_lane_s = fore_vehicle_s;
-    		recommended_lane = lane_num;
-    	} 
-    	else if (faster_lane_speed < fore_vehicle_v) {
-    		faster_lane_speed = fore_vehicle_v;
-    		recommended_lane = lane_num;
+	} else {
+std::cout << "[Back is not safe.] back_vehicle_s:" << back_vehicle_s << " ego_vehicle.s:" << ego_vehicle.s << std::endl;
+	}
+
+    if(fore_vehicle_v == 0 || (fore_vehicle_s - ego_vehicle.s) > SAFE_DISTANCE) {
+		//if(fore_vehicle_v >= ego_vehicle.v) {
+//std::cout << "[Fore is SAFE. Velocity OK]  fore_vehicle_v:" << fore_vehicle_v  << " ego_vehicle.v:" << ego_vehicle.v << std::endl;
+			is_fore_safe = true;
+		//} else {
+//std::cout << "[Fore is SAFE. Distance OK]  fore_vehicle_s:" << fore_vehicle_s << " ego_vehicle.s:" << ego_vehicle.s << std::endl;
+//}
+	} else {
+std::cout << "[Fore is not safe. Distance NG]  fore_vehicle_s:" << fore_vehicle_s  << " ego_vehicle.s:" << ego_vehicle.s << std::endl;
+	}
+
+	if (is_fore_safe && is_back_safe) {
+		is_safe = true;
+	}
+
+	if(lane_num == 0) {
+		farther_L_s = fore_vehicle_s;
+		faster_L_v = fore_vehicle_v;
+//std::cout << "is_safe_to_move SET L - farther_L_s:" << farther_L_s  << std::endl;
+
+	}
+	if(lane_num == 2) {
+		farther_R_s = fore_vehicle_s;
+		faster_R_v = fore_vehicle_v;
+//std::cout << "is_safe_to_move SET R - farther_R_s:" << farther_R_s  << std::endl;
+//std::cout << "is_safe_to_move SET R - farther_L_s:" << farther_L_s  << std::endl;
+	}
+
+    if (false) { //is_safe) {
+	    if(lane_num == 0) {
+	    	recommended_lane = lane_num;
+			farther_lane_s = farther_L_s;
+			faster_lane_speed = faster_L_v;
+		}
+		if(lane_num == 2) { 
+    		if (farther_lane_s < farther_R_s) {
+    			farther_lane_s = farther_R_s;
+    			recommended_lane = lane_num;
+    		}
+    		if (fore_vehicle_s == 0) {// 0/LeftÇ…é‘Ç™Ç»Ç¢Ç∆Ç´Ç…êÑëEÇ≥ÇÍÇ»Ç¢ñ‚ëË
+    			recommended_lane = lane_num;
+    		}
     	} 
     }
+
+//std::cout << "is_safe_to_move - recommended_lane:" << recommended_lane << " farther_lane_s:" << farther_lane_s << " faster_lane_speed:" << faster_lane_speed << std::endl;
+//std::cout << "is_safe_to_move - [Right] farther_R_s:" << farther_R_s << " faster_R_v:" << faster_R_v << std::endl;
+//std::cout << "is_safe_to_move - [Left]  farther_L_s:" << farther_L_s << " faster_L_v:" << faster_L_v << std::endl;
+//std::cout << "is_safe_to_move - [Num of Cars]  L_vehicle_num:" << L_vehicle_num << " R_vehicle_num:" << R_vehicle_num << std::endl;
+
     return is_safe;
 }
 bool BehaviorPlanner::is_risky_to_move(double back_vehicle_v) {
@@ -404,6 +458,46 @@ bool BehaviorPlanner::is_better_to_move(int lane_num) {
     return is_move;
 }
 
+void BehaviorPlanner::init_recommend_lane() {
+std::cout << "init_recommend_lane:" << std::endl;
+
+	recommended_lane = -1;
+	farther_lane_s = 0;
+	faster_lane_speed = 0;
+	farther_L_s  = 0;
+	faster_L_v = 0;
+	farther_R_s = 0;
+	faster_R_v = 0;
+	
+	
+	L_vehicle_num = 0;
+	R_vehicle_num = 0;
+}
 int BehaviorPlanner::recommend_lane() {
+
+	if (farther_L_s == 0) {
+		recommended_lane = 0;
+	} else if (farther_R_s == 0) {
+		recommended_lane = 2;
+	} else if (farther_L_s > farther_R_s) {
+		recommended_lane = 0;
+	} else {
+		recommended_lane = 2;
+	}
+std::cout << "recommend_lane - recommended_lane:" << recommended_lane << " farther_lane_s:" << farther_lane_s << " faster_lane_speed:" << faster_lane_speed << std::endl;
+std::cout << "recommend_lane - [Right] farther_R_s:" << farther_R_s << " faster_R_v:" << faster_R_v << std::endl;
+std::cout << "recommend_lane - [Left]  farther_L_s:" << farther_L_s << " faster_L_v:" << faster_L_v << std::endl;
+std::cout << "recommend_lane - [Num of Cars]  L_vehicle_num:" << L_vehicle_num << " R_vehicle_num:" << R_vehicle_num << std::endl;
+std::cout << "recommend_lane - [Ego]  ego_vehicle.s:" << ego_vehicle.s << " ego_vehicle.v:" << ego_vehicle.v << std::endl;
+	if (farther_R_s == 0 || farther_L_s == 0) {
+		map<int, Vehicle>::iterator it = this->vehicles.begin();
+	    while(it != this->vehicles.end())
+	    {
+	    	int v_id = it->first;
+	        Vehicle v = it->second;
+std::cout << "recommend_lane - v_id:" << v_id << " v.lane:" << v.lane << " v.s:" << v.s <<  " v.v:" << v.v << std::endl;
+			it++;
+		}
+	}
 	return recommended_lane;
 }
