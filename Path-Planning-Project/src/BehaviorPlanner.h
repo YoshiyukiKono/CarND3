@@ -10,9 +10,13 @@
 #include <map>
 #include <string>
 #include <iterator>
+#include <memory>
 #include "vehicle.h"
+#include "DrivingStrategy.h"
 
 using namespace std;
+
+class DrivingStrategy;
 
 class BehaviorPlanner {
 public:
@@ -20,12 +24,17 @@ public:
 	const int SAFE_DISTANCE = 20;
 	double fore_s_right;
 	double fore_s_vehicle;
+	
+	bool too_close;
+	int cur_lane;
+	int target_lane;
+	bool lane_change;
 
 	int recommended_lane;
 	double faster_lane_speed;
 	double farther_lane_s;
 	double ego_lane_speed;
-	double ego_lane_s;
+
 	double farther_L_s;
 	double faster_L_v;
 	double farther_R_s;
@@ -33,22 +42,8 @@ public:
 
 	double L_vehicle_num;
 	double R_vehicle_num;
-	
-	int update_width = 70;
-
-  	string ego_rep = " *** ";
-
-  	int ego_key = -1;
 
   	int num_lanes;
-
-    vector<int> lane_speeds;
-
-    int speed_limit;
-
-    double density;
-
-    int camera_center;
 
     map<int, Vehicle> vehicles;
     Vehicle ego_vehicle;
@@ -58,7 +53,6 @@ public:
     /**
   	* Constructor
   	*/
-  	BehaviorPlanner(int speed_limit, double traffic_density, vector<int> lane_speeds);
   	BehaviorPlanner();
 
   	/**
@@ -66,30 +60,40 @@ public:
   	*/
   	virtual ~BehaviorPlanner();
 
-  	Vehicle get_ego();
-
-  	void populate_traffic();
   	void populate_traffic(vector<vector<double>> sensor_fusion);
 
-  	void advance();
+  	void plan(int& lane, int& prev_size);
 
-  	void display(int timestep);
-
-  	void add_ego(int lane_num, int s, vector<int> config_data);
   	void add_ego(int lane_num, int s, double speed);
 
-  	void cull();
-  	
-  	int convert_to_lane(float d);
-  	bool is_safe_to_move(int lane_num);
-  	bool is_better_to_move();
-  	bool is_better_to_move(int lane_num);
-  	int recommend_lane();
-  	bool is_risky_to_move(double back_vehicle_v);
-
-	void find_vehicle_forward(int lane_num, int s);
-	void find_vehicle_backward(int lane_num, int s);
-	
+	bool is_safe_to_move(int lane_num);
 	void init_recommend_lane();
+	int recommend_lane();
+	bool is_initialized();
+
+	void update_route_planning_offline();
+
+	// Unimplemented training function
+	void train(vector<vector<double>> sensor_fusion);
+
+private:
+
+	map<int, shared_ptr<DrivingStrategy>> drive_strategies;
+
+	int convert_to_lane(float d);
+
+	// Unimplemented prediction functions
+	void predict();
+	void predict_vehicle(Vehicle& vehicle);
+	void save_previous_state();
+	void update_prediction_model(int lane, int prev_lane, float s, float d, float s_dot, float d_dot);
+	int get_prev_lane(int vehicle_id);
+
+	// Unimplemented cost functions
+	bool is_better_to_move();
+	int recommend_lane_in_a_long_run();
+	void avoid_if_dangerous_situation();
 };
+
+
 #endif
