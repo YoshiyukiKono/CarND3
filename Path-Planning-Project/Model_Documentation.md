@@ -17,10 +17,10 @@ although it wouldn't change the car's behavior such drastically in the simulator
 
 From the above process, I ended up with thinking about the cost function as follows.
 
-* It might be better to treat the cost at some different levels rather than having the only one consolidated cost, that is,
-** 1) simple(low-computing-cost) one for the decision taken at the time, which is almost enough for this project
-** 2) more complex one for the route in a long run, for which prediction works to find better route
-** 3) emergency one for the exceptional dangerous situation
+It might be better to treat the cost at some different levels rather than having the only one consolidated cost, that is,
+* 1) simple(low-computing-cost) one for the decision taken at the time, which is almost enough for this project
+* 2) more complex one for the route in a long run, for which prediction works to find better route
+* 3) emergency one for the exceptional dangerous situation
 
 ### Design of my project
 
