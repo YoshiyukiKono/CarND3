@@ -11,16 +11,39 @@ import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
 
+from tensorflow.python.platform import gfile
+from tensorflow.core.protobuf import saved_model_pb2
+from tensorflow.python.util import compat
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
 print('TensorFlow Version: {}'.format(tf.__version__))
 
 # Check for a GPU
+
 if not tf.test.gpu_device_name():
     warnings.warn('No GPU found. Please use a GPU to train your neural network.')
 else:
     print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+
+
+def write_graph(model_filename):
+    with tf.Session() as sess:
+        with gfile.FastGFile(model_filename, 'rb') as f:
+            data = compat.as_bytes(f.read())
+            sm = saved_model_pb2.SavedModel()
+            sm.ParseFromString(data)
+            g_in = tf.import_graph_def(sm.meta_graphs[0].graph_def)
+
+    LOGDIR='.'
+    train_writer = tf.summary.FileWriter(LOGDIR)
+    train_writer.add_graph(sess.graph)
+
+"""
+# tensorboard --logdir=.
+model_filename ='./data/vgg/saved_model.pb'
+write_graph(model_filename)
+"""
 
 def load_vgg(sess, vgg_path):
     """
@@ -68,31 +91,55 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
     output = tf.layers.conv2d_transpose(conv_1x1, num_classes, 4, 2, padding='same',
                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+
     # Adopted from Lesson 10: Scene Understanding "8. FNCN-8 - Decoder"
     input = tf.add(input, pool_4)
     input = tf.layers.conv2d_transpose(input, num_classes, 4, strides=(2, 2))
     input = tf.add(input, pool_3)
     Input = tf.layers.conv2d_transpose(input, num_classes, 16, strides=(8, 8))
     output = tf.layers.conv2d_transpose(input, num_classes, 4, strides=(2, 2))
+
+    # Sample from the first review
+    conv_1x1_7 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same', 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(reg_param),
+        kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     """
+
+    # 
+    reg_param = 1e-3
+
     # Adopted from "Python Deep Learning Cookbook"
     # vgg_layer7_out => decode_layer1_preskip0
-    decode_layer1_preskip0 = tf.layers.conv2d_transpose(vgg_layer7_out, 512, (2, 2), (2, 2), name='decode_layer1_preskip0')
+    decode_layer1_preskip0 = tf.layers.conv2d_transpose(vgg_layer7_out, 512, (2, 2), (2, 2), name='decode_layer1_preskip0',
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(reg_param),
+        kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     # vgg_layer4_out => decode_layer1_preskip1
-    decode_layer1_preskip1 = tf.layers.conv2d(vgg_layer4_out, 512, (1, 1), (1, 1), name='decode_layer1_preskip1')
+    decode_layer1_preskip1 = tf.layers.conv2d(vgg_layer4_out, 512, (1, 1), (1, 1), name='decode_layer1_preskip1',
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(reg_param),
+        kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     # decode_layer1_preskip0 + decode_layer1_preskip1 => decode_layer1_out
     decode_layer1_out = tf.add(decode_layer1_preskip0, decode_layer1_preskip1, name='decode_layer1_out')
 
     # decode_layer1_out => decode_layer2_preskip0
-    decode_layer2_preskip0 = tf.layers.conv2d_transpose(decode_layer1_out, 256, (2, 2), (2, 2), name='decode_layer2_preskip0')
+    decode_layer2_preskip0 = tf.layers.conv2d_transpose(decode_layer1_out, 256, (2, 2), (2, 2), name='decode_layer2_preskip0',
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(reg_param),
+        kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     # vgg_layer3_out => decode_layer2_out
-    decode_layer2_preskip1 = tf.layers.conv2d(vgg_layer3_out, 256, (1, 1), (1, 1), name='decode_layer2_preskip1')
+    decode_layer2_preskip1 = tf.layers.conv2d(vgg_layer3_out, 256, (1, 1), (1, 1), name='decode_layer2_preskip1',
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(reg_param),
+        kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     # decode_layer2_preskip0 + decode_layer2_preskip1 => decode_layer2_out
     decode_layer2_out = tf.add(decode_layer2_preskip0, decode_layer2_preskip1, name='decode_layer2_out')
 
-    decode_layer3_out = tf.layers.conv2d_transpose(decode_layer2_out, 128, (2, 2), (2, 2), name='decode_layer3_out')
-    decode_layer4_out = tf.layers.conv2d_transpose(decode_layer3_out, 64, (2, 2), (2, 2), name='decode_layer4_out')
-    decode_layer5_out = tf.layers.conv2d_transpose(decode_layer4_out, num_classes, (2, 2), (2, 2), name='fcn_out')
+    decode_layer3_out = tf.layers.conv2d_transpose(decode_layer2_out, 128, (2, 2), (2, 2), name='decode_layer3_out',
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(reg_param),
+        kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
+    decode_layer4_out = tf.layers.conv2d_transpose(decode_layer3_out, 64, (2, 2), (2, 2), name='decode_layer4_out',
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(reg_param),
+        kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
+    decode_layer5_out = tf.layers.conv2d_transpose(decode_layer4_out, num_classes, (2, 2), (2, 2), name='fcn_out',
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(reg_param),
+        kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     return decode_layer5_out
 
 tests.test_layers(layers)
@@ -110,9 +157,17 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     # TODO: Implement function
     logits = tf.reshape(nn_last_layer, (-1, num_classes), name="logits")
     labels = tf.reshape(correct_label, (-1, num_classes), name="labels")
+
+
     #cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
-    cross_entropy_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=labels)
-    train_op = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=labels))
+    #train_op = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
+
+    # Adapted from the suggestion in the first review
+    l2_loss = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
+    loss = tf.reduce_mean(cross_entropy_loss + l2_loss)
+    train_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+
     return (logits, train_op, cross_entropy_loss)
 
 tests.test_optimize(optimize)
@@ -144,9 +199,14 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
             # Training
             _, loss = sess.run([train_op, cross_entropy_loss],
             feed_dict={input_image:image, correct_label:label,keep_prob:0.5,learning_rate:1e-4})
+            print("Loss at batch: {}".format(loss))
+            #print("len(image) at batch: {}".format(len(image)))
             epoch_loss += loss * len(image)
             epoch_size += len(image)
-        print("Loss at epoch {}: {}".format(epoch, epoch_loss/epoch_size))
+            #print("epoch_loss at batch: {}".format(epoch_loss))
+            #print("epoch_size at batch: {}".format(epoch_size))
+        #print("Loss at epoch {}: {}".format(epoch, epoch_loss/epoch_size))
+        print("Loss at epoch {}: {}".format(epoch, epoch_loss))
 
 tests.test_train_nn(train_nn)
 
@@ -187,7 +247,11 @@ def run():
 
         # TODO: Train NN using the train_nn function
         epochs = 23
-        batch_size = 16
+        # Changed the batch size suggested in the first review as follows:
+        # Batch size used is on larger side. Try setting a value around 2 or 4.
+        # larger batch sizes might speed up the training but can degrade the quality of the model at the same time.
+        #batch_size = 16
+        batch_size = 4
 
         sess.run(tf.variables_initializer(set(tf.global_variables()) - temp))
 
